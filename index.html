@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#111816" />
+    <title>Soundboard</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --background: #111816;
+        --surface: #19221f;
+        --surface-hover: #202d29;
+        --border: #2c3b36;
+        --text: #eff8f3;
+        --muted: #a6b8af;
+        --accent: #52d39a;
+        --accent-ink: #092218;
+        --danger: #ffb4a8;
+        font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        min-width: 320px;
+        min-height: 100dvh;
+        margin: 0;
+        color: var(--text);
+        background: var(--background);
+      }
+
+      button { font: inherit; }
+
+      .app-shell {
+        width: min(1280px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: clamp(28px, 5vw, 64px) 0 48px;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+        padding-bottom: 28px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1; letter-spacing: -0.055em; }
+      .subtitle { margin: 10px 0 0; color: var(--muted); font-size: 0.98rem; }
+
+      .stop-all {
+        min-height: 44px;
+        padding: 0 16px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        color: var(--text);
+        background: transparent;
+        cursor: pointer;
+      }
+
+      .stop-all:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+      .stop-all:active:not(:disabled) { transform: translateY(1px); }
+      .stop-all:disabled { cursor: not-allowed; opacity: 0.45; }
+
+      main { padding-top: 28px; }
+
+      .status-panel {
+        display: grid;
+        place-items: center;
+        min-height: 260px;
+        padding: 28px;
+        border: 1px dashed var(--border);
+        border-radius: 16px;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .status-panel p { margin: 0; }
+      .status-panel strong { display: block; margin-bottom: 8px; color: var(--text); font-size: 1.15rem; }
+
+      .sound-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+        gap: 12px;
+      }
+
+      .sound-button {
+        position: relative;
+        display: flex;
+        align-items: center;
+        min-height: 104px;
+        padding: 18px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        color: var(--text);
+        background: var(--surface);
+        box-shadow: 0 8px 18px rgb(0 0 0 / 0.12);
+        cursor: pointer;
+        text-align: left;
+        transition: border-color 140ms ease, background 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+      }
+
+      .sound-button:hover { border-color: #496158; background: var(--surface-hover); transform: translateY(-2px); box-shadow: 0 12px 24px rgb(0 0 0 / 0.2); }
+      .sound-button:active { transform: translateY(1px) scale(0.99); }
+      .sound-button:focus-visible, .stop-all:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+      .sound-label {
+        display: block;
+        width: 100%;
+        overflow: hidden;
+        font-size: 1rem;
+        font-weight: 650;
+        line-height: 1.35;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .playing-indicator {
+        position: absolute;
+        right: 15px;
+        bottom: 13px;
+        display: none;
+        color: var(--accent-ink);
+        font-size: 0.72rem;
+        font-weight: 750;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .sound-button.is-playing {
+        border-color: var(--accent);
+        color: var(--accent-ink);
+        background: var(--accent);
+        box-shadow: 0 12px 28px rgb(82 211 154 / 0.2);
+      }
+
+      .sound-button.is-playing:hover { border-color: #a2f0ca; background: #6ee2ac; }
+      .sound-button.is-playing .playing-indicator { display: block; }
+
+      .retry-button {
+        min-height: 42px;
+        margin-top: 18px;
+        padding: 0 15px;
+        border: 1px solid var(--accent);
+        border-radius: 12px;
+        color: var(--accent-ink);
+        background: var(--accent);
+        cursor: pointer;
+      }
+
+      @media (max-width: 560px) {
+        .app-shell { width: min(100% - 24px, 1280px); padding-top: 24px; }
+        .topbar { align-items: start; flex-direction: column; gap: 18px; padding-bottom: 24px; }
+        .stop-all { width: 100%; }
+        .sound-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+        .sound-button { min-height: 92px; padding: 14px; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>Soundboard</h1>
+          <p class="subtitle" id="sound-count">Discovering local sounds...</p>
+        </div>
+        <button class="stop-all" id="stop-all" type="button" disabled>Stop all</button>
+      </header>
+      <main id="soundboard" aria-live="polite">
+        <section class="status-panel" aria-label="Soundboard status"><p>Loading sounds...</p></section>
+      </main>
+    </div>
+
+    <script>
+      const board = document.getElementById("soundboard");
+      const soundCount = document.getElementById("sound-count");
+      const stopAllButton = document.getElementById("stop-all");
+      let currentAudio = null;
+      let currentButton = null;
+
+      function displayName(filename) {
+        return filename.replace(/\.(mp3|m4a)$/i, "");
+      }
+
+      function resetCurrentSound() {
+        if (currentAudio) {
+          currentAudio.pause();
+          currentAudio.currentTime = 0;
+        }
+        if (currentButton) {
+          currentButton.classList.remove("is-playing");
+          currentButton.setAttribute("aria-pressed", "false");
+        }
+        currentAudio = null;
+        currentButton = null;
+        stopAllButton.disabled = true;
+      }
+
+      function showStatus(title, detail, withRetry) {
+        board.replaceChildren();
+        const panel = document.createElement("section");
+        panel.className = "status-panel";
+        const message = document.createElement("p");
+        const heading = document.createElement("strong");
+        heading.textContent = title;
+        message.append(heading, document.createTextNode(detail));
+        panel.append(message);
+        if (withRetry) {
+          const retry = document.createElement("button");
+          retry.className = "retry-button";
+          retry.type = "button";
+          retry.textContent = "Try again";
+          retry.addEventListener("click", loadSounds);
+          panel.append(retry);
+        }
+        board.append(panel);
+      }
+
+      function playSound(button, audio) {
+        if (currentButton === button) {
+          resetCurrentSound();
+          return;
+        }
+
+        resetCurrentSound();
+        currentAudio = audio;
+        currentButton = button;
+        button.classList.add("is-playing");
+        button.setAttribute("aria-pressed", "true");
+        stopAllButton.disabled = false;
+
+        const resetIfCurrent = () => {
+          if (currentAudio === audio) resetCurrentSound();
+        };
+        audio.addEventListener("error", resetIfCurrent, { once: true });
+
+        audio.play().catch(resetIfCurrent);
+      }
+
+      function renderSounds(sounds) {
+        board.replaceChildren();
+        const grid = document.createElement("section");
+        grid.className = "sound-grid";
+        grid.setAttribute("aria-label", "Available sounds");
+
+        sounds.forEach((filename) => {
+          // Creating and preloading audio here removes most of the click-to-play delay
+          // for a local soundboard. `loop` keeps the selected sound playing until stopped.
+          const audio = new Audio(encodeURIComponent(filename));
+          audio.preload = "auto";
+          audio.loop = true;
+          audio.load();
+
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "sound-button";
+          button.title = displayName(filename);
+          button.setAttribute("aria-pressed", "false");
+          button.setAttribute("aria-label", `Play ${displayName(filename)}`);
+
+          const label = document.createElement("span");
+          label.className = "sound-label";
+          label.textContent = displayName(filename);
+          const indicator = document.createElement("span");
+          indicator.className = "playing-indicator";
+          indicator.textContent = "Playing";
+          indicator.setAttribute("aria-hidden", "true");
+          button.append(label, indicator);
+          button.addEventListener("click", () => playSound(button, audio));
+          grid.append(button);
+        });
+
+        board.append(grid);
+      }
+
+      async function loadSounds() {
+        resetCurrentSound();
+        soundCount.textContent = "Discovering local sounds...";
+        showStatus("Loading sounds...", "Looking for .mp3 and .m4a files in this folder.");
+        try {
+          const response = await fetch("/sounds", { cache: "no-store" });
+          if (!response.ok) throw new Error("Sound list request failed");
+          const data = await response.json();
+          if (!data || !Array.isArray(data.sounds) || !data.sounds.every((item) => typeof item === "string")) {
+            throw new Error("Invalid sound list response");
+          }
+          if (data.sounds.length === 0) {
+            soundCount.textContent = "No sounds available";
+            showStatus("No sounds found", "Add .mp3 or .m4a files to this soundboard folder, then refresh the page.");
+            return;
+          }
+          soundCount.textContent = `${data.sounds.length} sound${data.sounds.length === 1 ? "" : "s"} available`;
+          renderSounds(data.sounds);
+        } catch (error) {
+          console.error(error);
+          soundCount.textContent = "Could not discover sounds";
+          showStatus("Could not load sounds", "Make sure server.py is running, then try again.", true);
+        }
+      }
+
+      stopAllButton.addEventListener("click", resetCurrentSound);
+      loadSounds();
+    </script>
+  </body>
+</html>
